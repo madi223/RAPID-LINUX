@@ -21,7 +21,7 @@
 //#include <dirent.h>
 //#include <string.h>
 //#include <sys/types.h>
-#define DEFAULT_UE_BW 32000000 // 32MB/s (256 Mbps)
+#define DEFAULT_UE_BW 8000000 // 8MB/s (64 Mbps)
 #define INITIAL_WINDOW 10
 #define DEFAULT_MSS 1460
 #define WS_FACTOR 7
@@ -31,6 +31,17 @@
     ((unsigned char *)&addr)[1], \
     ((unsigned char *)&addr)[2], \
     ((unsigned char *)&addr)[3]
+
+uint64_t mymin(uint64_t a, uint64_t b){
+  if (a < b)
+    return a;
+  return b;
+}
+uint64_t mymax(uint64_t a, uint64_t b){
+  if (a > b)
+    return a;
+  return b;
+}
 
 struct list_head *mobtab;
 //uint32_t DEFAULT_UE_BW;
@@ -44,15 +55,16 @@ struct conn {
   uint32_t srtt;
   uint32_t rttmin;
   uint32_t rttwan;
-  uint32_t epoch;
-  uint32_t elapsed;
-  uint32_t ctime;
+  u64 epoch;
+  u64 elapsed;
+  u64 ctime;
   unsigned  int mss;
   unsigned  int k_rtt;
   unsigned  int  data;
   bool isSlow;
   uint64_t avail;
   uint64_t ema_prev;
+  int mydata;
   
 };
 
@@ -104,46 +116,63 @@ void update_unused_bw(struct mobile *ue){
 
 void update_flow_state(struct mobile *ue, struct conn *flow,unsigned int data){
   flow->data+=data;
+  flow->mydata+=data;
   //printk(KERN_INFO "[RAPID] #CONN : %d ; rbw : %llu ; rttwan %u \n",ue->fc,ue->rbw,flow->rttwan);
-  if(flow->epoch == 0 ){
-    flow->rttwan = flow->rttmin; // in us
+  if((flow->epoch == 0 )&&(flow->srtt > 0)){
+    //flow->rttwan = flow->rttmin; // in us
+    flow->rttwan = flow->rttmin <= flow->srtt ? flow->rttmin : flow->srtt;
     uint64_t init_bdp = ((ue->rbw/ue->fc)*(flow->rttwan)); // /1000000; // initial BDP in MBytes
     //printk(KERN_INFO "[RAPID] #init_bdp1 : %llu rttwan: %u\n",init_bdp,flow->rttwan);
     init_bdp = init_bdp >> 20;                     // initial BDP in Bytes
     //printk(KERN_INFO "[RAPID] #init_bdp>>20 : ll%u \n",init_bdp);
     flow->bdp = init_bdp;
     flow->rwthresh = init_bdp;
-    flow->k_rtt = log2ff(flow->rwthresh/flow->mss)+1;
+    flow->k_rtt = log2ff(flow->rwthresh/flow->mss)+1+1;
     flow->ctime = (flow->k_rtt)*(flow->rttwan); // categorization period in us
-    flow->epoch =   ktime_get_ns() >> 10; // in us
-    flow->elapsed = ktime_get_ns() >> 10; // in us
-    return;
+    flow->ctime = flow->ctime << 10;
+    flow->epoch =   ktime_get_ns() ;//>> 10; // in us
+    flow->elapsed = ktime_get_ns() ;//>> 10; // in us
+    flow->arrival_rate = flow->data;
+    //return;
   }
+
+  //printk(KERN_INFO "[RAPIDlog] #BDP : %llu rttwan: %u\n",flow->rwthresh,flow->rttwan);
 
   if (flow->epoch != 0){
     flow->bdp = ((ue->rbw/ue->fc)*(flow->rttwan)) >> 20;
-    flow->arrival_rate = ((flow->data)/(flow->rttwan)) >> 20; // in Bytes/s (B/s)
+    flow->arrival_rate = flow->data; /*((flow->data)/(flow->rttwan)) >> 20;*/ // in Bytes/s (B/s)
     //flow->arrival_rate = (flow->data)/1000 // in Bytes/s (B/s)
-    flow->expected_rate = ((flow->bdp)/(flow->rttwan)) >> 20;
-    if (((ktime_get_ns() >> 10)-flow->elapsed)>=flow->rttwan){ // 1 RTT has passed
+    flow->expected_rate = flow->rwthresh; //((flow->bdp)/(flow->rttwan)) >> 20;
+    uint64_t rtt_1 = flow->rttwan;
+    rtt_1 = rtt_1 << 10;
+    u64 period = ktime_get_ns();
+    if (((period /*>> 10*/)-flow->elapsed)>/*flow->*/rtt_1+1500000/*rttwan*//*+2200*/){ // 1 RTT has passed
       flow->data = 0;
       uint64_t curr_rate = flow->arrival_rate;
       //double alpha = 0.4 = 13/32; ((curr_rate)*(1-alpha)) + (flow->ema_prev)*(alpha)
       flow->ema_prev = flow->ema_prev == 0 ? curr_rate : (curr_rate - xtime04(curr_rate)) + (xtime04(flow->ema_prev));
-      flow->elapsed = ktime_get_ns() >> 10; // reset RTT timer  
+      flow->elapsed = ktime_get_ns() ;/*>> 10;*/ // reset RTT timer
+      //printk(KERN_INFO "[RAPIDlog] 1RTT END : time = %u; expected : %llu ; avg : %llu ; arrival : %llu",rtt_1/*flow->rttwan*/,flow->expected_rate,flow->ema_prev,flow->arrival_rate);
+      //printk(KERN_INFO "[RAPIDlog] 1RTT END : now = %llu; elapsed: %llu ",ktime_get_ns(),flow->elapsed);
     }
     //#if 0
-    if (((ktime_get_ns() >> 10)-flow->epoch)>=flow->ctime){ // end of categorization period
+    period = ktime_get_ns();
+    if (((period /*>> 10*/)-flow->epoch)>=flow->ctime+1500000/*+2200*/){ // end of categorization period
+      flow->arrival_rate+= flow->data;
+      flow->ema_prev = flow->ema_prev == 0 ? flow->arrival_rate : (flow->arrival_rate - xtime04(flow->arrival_rate)) + (xtime04(flow->ema_prev));
       uint64_t exp_rate = flow->expected_rate;
       uint64_t avg_rate = flow->ema_prev;
       uint64_t thresh85 = 1*7;
       thresh85 = thresh85 >> 3;
-      if ((avg_rate/exp_rate)<thresh85/*0.85*/){ // flow is slow or app-limited
+      //printk(KERN_INFO "[RAPIDlog] CAT END : time = %u; expected : %llu ; avg : %llu ; arrival : %llu",flow->ctime, exp_rate,avg_rate,flow->arrival_rate);
+      //printk(KERN_INFO "[RAPIDlog] 1RTT END : now = %llu; elapsed: %llu ",ktime_get_ns(),flow->epoch);
+      if (flow->arrival_rate< ((exp_rate*7) >>3)/*0.85*/){ // flow is slow or app-limited
 	 flow->isSlow = true;
-         flow->rwthresh = (avg_rate/exp_rate)*flow->rwthresh;
+         flow->rwthresh = mymin(mymax(avg_rate,INITIAL_WINDOW*DEFAULT_MSS),flow->bdp);//(avg_rate/exp_rate)*flow->rwthresh;
 	 flow->rwthresh = flow->rwthresh < flow->bdp ? flow->rwthresh : flow->bdp;
          flow->avail = flow->bdp > flow->rwthresh ? flow->bdp - flow->rwthresh: 0; //std::abs( m_rw - m_bdp);
 	 //ue->unused+=flow->avail;
+	 // printk(KERN_INFO "[RAPID] SLOW FLOW : WINDOW = %llu",flow->rwthresh);
       }
       else{
 	flow->isSlow = false;
@@ -152,14 +181,21 @@ void update_flow_state(struct mobile *ue, struct conn *flow,unsigned int data){
       }
       // rediscover RTTmin : I'll keep it for now (might solve the issue with UDP flows)
       //flow->rttwan = flow->rttmin; // in us
-      flow->bdp = ((ue->rbw/ue->fc)*(flow->rttwan))/1000000;
+      flow->rttwan = flow->rttmin <= flow->srtt ? flow->rttmin : flow->rttwan;
+      //uint32_t rtt_sample = ((flow->rttmin > 0) && (flow->rttmin <= flow->srtt)) ? flow->rttmin : flow->srtt;
+      //flow->rttwan = ((flow->srtt > 0) && (flow->srtt <= flow->rttwan)) ? flow->srtt : flow->rttwan;
+      //flow->rttwan = rtt_sample < flow->rttwan ? rtt_sample : flow->rttwan;
+      flow->bdp = ((ue->rbw/ue->fc)*(flow->rttwan)) >> 20;
       update_unused_bw(ue);
-      flow->rwthresh = flow->isSlow == true ? flow->rwthresh: flow->bdp + (ue->unused/ue->nfast);
-      flow->k_rtt = log2ff(flow->rwthresh/flow->mss)+1;
-      flow->ctime = (flow->k_rtt)*(flow->rttwan); // categorization period in us                                                                                                            
-      flow->epoch =   ktime_get_ns() >> 10; // in us                                                           
-      flow->elapsed = ktime_get_ns() >> 10; // in us 
+      flow->rwthresh = flow->isSlow == true ? flow->rwthresh: mymin(flow->bdp*ue->fc,flow->bdp+(ue->unused/ue->nfast));
+      flow->k_rtt = log2ff(flow->rwthresh/flow->mss)+1+1;
+      rtt_1 = flow->rttwan;
+      rtt_1 = rtt_1 << 10;
+      flow->ctime = flow->k_rtt <= 0 ? /*flow->rttwan*/rtt_1 : (flow->k_rtt)*(rtt_1/*flow->rttwan*/); // categorization period in us                                                                                                            
+      flow->epoch =   ktime_get_ns()  ;// >> 10; // in us                                                           
+      flow->elapsed = ktime_get_ns(); //>> 10; // in us 
       flow->ema_prev = 0;
+      //flow->rttwan = flow->srtt > 0 ? flow->rttmin : flow->rttwan;
     }
     //#endif  
   }
@@ -213,11 +249,13 @@ void remove_ue_or_conn(int port, struct list_head *listhead){
   struct rflow *found = NULL;
   found = find_ue_entry(port,listhead);
   if(found != NULL){
+    //if((found->mob->fc -1) >= 1){
     list_del(&found->conn_out->list);
-    if((found->mob->fc - 1)<=0)
+    
+    /*if((found->mob->fc - 1)>=1)
       list_del(&found->mob->list);
-    else
-      found->mob->fc-=1;
+      else*/
+    found->mob->fc-=1;//}
   }
 }
 bool update_ue_info (struct conn *newconn, struct list_head *listhead){
@@ -226,11 +264,13 @@ bool update_ue_info (struct conn *newconn, struct list_head *listhead){
   struct conn *entry = NULL;
   struct conn *found = NULL;
   bool ret = true;
+  /*if(listhead = NULL)
+    INIT_LIST_HEAD(listhead);*/
   list_for_each(p,listhead)
     {
       entry = list_entry(p,struct conn,list);
       if (entry->port == newconn->port){
-	printk(KERN_INFO "=== [RAPID ] : Port already exists ===\n");
+	//printk(KERN_INFO "=== [RAPID ] : Port already exists ===\n");
 	found = entry;
 	ret = false;
         break;
@@ -238,7 +278,7 @@ bool update_ue_info (struct conn *newconn, struct list_head *listhead){
     }
       if (found == NULL){
 	list_add(&newconn->list,listhead);
-	printk(KERN_INFO "=== [RAPID ] : new port added ===\n");
+	//printk(KERN_INFO "=== [RAPID ] : new port added ===\n");
       }
       return ret;
 }
@@ -251,7 +291,7 @@ bool update_ue_info (struct conn *newconn, struct list_head *listhead){
     {
       ue = list_entry(p,struct mobile,list);
       if (strcmp(ue->ip,ue_key->ip)==0){
-	printk(KERN_INFO "=== [RAPID ] : UE in TAB: add new port ===\n");
+	//printk(KERN_INFO "=== [RAPID ] : UE in TAB: add new port ===\n");
 	struct conn *ueport = kmalloc(sizeof(struct conn), GFP_KERNEL);
 	ueport->port = port;
 	ueport->bdp = ((INITIAL_WINDOW)*(DEFAULT_MSS));
@@ -263,7 +303,13 @@ bool update_ue_info (struct conn *newconn, struct list_head *listhead){
 	ueport->ctime = 0;
 	ueport->avail = 0;
 	ueport->ema_prev = 0;
+	ueport->rttwan = 0;
+	ueport->srtt = 0;
+	ueport->rttmin = 0;
 	ueport->rwthresh = ((INITIAL_WINDOW)*(DEFAULT_MSS));
+	ueport->mydata = 0;
+	if(ue->fc <=0)
+	  INIT_LIST_HEAD(&ue->porttab);
 
 	if(update_ue_info(ueport,&ue->porttab))
 	  ue->fc+=1;
@@ -285,6 +331,10 @@ bool update_ue_info (struct conn *newconn, struct list_head *listhead){
     firstconn->avail = 0;
     firstconn->ema_prev = 0;
     firstconn->rwthresh = ((INITIAL_WINDOW)*(DEFAULT_MSS));
+    firstconn->rttwan = 0;
+    firstconn->srtt = 0;
+    firstconn->rttmin = 0;
+    firstconn->mydata = 0;
 
     ue_key->fc+=1;
     INIT_LIST_HEAD(&ue_key->porttab);
@@ -336,6 +386,7 @@ unsigned int rapid_func_out(unsigned int hooknum,
     sock_buff = skb;
 
     if (!sock_buff) {
+        printk(KERN_INFO " [RAPIDlog] NO_SKBUFF\n");
         return NF_ACCEPT;
     }
 
@@ -383,10 +434,13 @@ unsigned int rapid_func_out(unsigned int hooknum,
            //printk(KERN_INFO "[RAPID] SRTT :%u ; RTT_min : %u",tp->srtt_us >> 3,minmax_get(&tp->rtt_min));
 	   pep->conn_out->srtt = (tp->srtt_us >> 3)/*/1000*/;
 	   pep->conn_out->rttmin = (minmax_get(&tp->rtt_min))/*/1000*/;
+	   //printk(KERN_INFO "[RAPID] input:  SRTT :%u ; RTT_min : %u ; RTTWAN : %u",pep->conn_out->srtt,pep->conn_out->rttmin,pep->conn_out->rttwan);
          }
         }
 
-	tcp_header->window = ntohs(pep->conn_out->rwthresh >> WS_FACTOR);
+	tcp_header->window = ntohs(pep->conn_out->rwthresh /*69376*/ >> WS_FACTOR);
+	//printk(KERN_INFO "[RAPIDlog] #BDP : %llu rttwan: %u\n",pep->conn_out->rwthresh,pep->conn_out->rttwan);
+	//tcp_header->window = ntohs(65920 >> WS_FACTOR);
 	   //unsigned int tcplen;
 	   //tcplen = sock_buff->len - ip_hdrlen(sock_buff) - 14;
 	   //tcp_header->check = 0;
@@ -403,6 +457,8 @@ unsigned int rapid_func_out(unsigned int hooknum,
 	   //printk(KERN_INFO "[RAPID] OLD window: %d, NEW window: %d \n", window,htons((unsigned short int) tcp_header->window));
 	   //printk(KERN_INFO "[RAPID] OLD window: %d, NEW : %d ; RWthresh: %llu ; isSLOW : %d\n", window,htons((unsigned short int) tcp_header->window),pep->conn_out->rwthresh,pep->conn_out->isSlow /*>>7*/);
 	   }
+	 /*else
+	   printk(KERN_INFO "[RAPIDlog] NOPEP\n");*/
 	}
         return NF_ACCEPT;
     }
@@ -454,20 +510,24 @@ unsigned int rapid_func_in(unsigned int hooknum,
         pep = find_ue_by_port(dport,mobtab);
          if ((pep != NULL)&&(pep->conn_out != NULL)){
         struct tcp_sock *tp=NULL;
+
         if(sock_buff->sk!=NULL){
          tp = tcp_sk(sock_buff->sk);
          if(tp!= NULL ){
 	   //unsigned int payload = sock_buff->len - sizeof(struct tcphdr) - sizeof(struct iphdr);
 	   //pep->conn_out->data+=sock_buff->data_len;
            //printk(KERN_INFO "[RAPID] Data: %d; D+: %d;  SRTT :%u ; RTT_min : %u",/*payload*/sock_buff->data_len,pep->conn_out->data,tp->srtt_us >> 3,minmax_get(&tp->rtt_min));
-	   pep->conn_out->srtt = (tp->srtt_us >> 3)/*/1000*/;
-           pep->conn_out->rttmin =(minmax_get(&tp->rtt_min))/*/1000*/;
+	   pep->conn_out->srtt = (tp->srtt_us >> 3) > 0 ?  (tp->srtt_us >> 3) : pep->conn_out->srtt/*/1000*/;
+           pep->conn_out->rttmin = (tp->srtt_us >> 3) > 0 ? (minmax_get(&tp->rtt_min)) : pep->conn_out->rttmin/*/1000*/;
+	   //printk(KERN_INFO "[RAPID] input:  SRTT :%u ; RTT_min : %u",pep->conn_out->srtt,pep->conn_out->rttmin);
          }
         }
+
 	if(sock_buff->data_len > 0){
-	  //pep->conn_out->data+=sock_buff->data_len;
-	  update_flow_state(pep->mob,pep->conn_out,sock_buff->data_len);
-	}
+	  //mydata + = htons((unsigned short int)iph->tot_len);
+	  update_flow_state(pep->mob,pep->conn_out,htons((unsigned short int)iph->tot_len)/*sock_buff->data_len*/);
+	  //printk(KERN_INFO "[RAPIDcount] DataCOUNT : %d",pep->conn_out->mydata); 
+	  }
       }
 	//add_mobile(ue,mobtab,dport);
 	
