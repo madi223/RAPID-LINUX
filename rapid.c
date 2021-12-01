@@ -1,4 +1,5 @@
 #include <linux/list.h>
+#include <linux/version.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
@@ -21,10 +22,159 @@
 //#include <dirent.h>
 //#include <string.h>
 //#include <sys/types.h>
-#define DEFAULT_UE_BW 8000000 // 8MB/s (64 Mbps)
+
+
+#define DEFAULT_UE_BW 1000000 // 1MB/s (8 Mbps)
 #define INITIAL_WINDOW 10
 #define DEFAULT_MSS 1460
 #define WS_FACTOR 7
+uint64_t UE_RNIS_RADIO_BW;
+
+#include <linux/cdev.h>
+#include <linux/device.h>
+#include<linux/slab.h>                 //kmalloc()
+#include<linux/uaccess.h>              //copy_to/from_user()
+#include <linux/ioctl.h>
+ 
+ 
+#define WR_VALUE _IOW('a','a',int32_t*)
+#define RD_VALUE _IOR('a','b',int32_t*)
+ 
+int32_t value = 0;
+ 
+dev_t dev = 0;
+static struct class *dev_class;
+static struct cdev etx_cdev;
+/*
+** Function Prototypes
+*/
+//static int      __init etx_driver_init(void);
+//static void     __exit etx_driver_exit(void);
+static int      etx_open(struct inode *inode, struct file *file);
+static int      etx_release(struct inode *inode, struct file *file);
+static ssize_t  etx_read(struct file *filp, char __user *buf, size_t len,loff_t * off);
+static ssize_t  etx_write(struct file *filp, const char *buf, size_t len, loff_t * off);
+static long     etx_ioctl(struct file *file, unsigned int cmd, unsigned long arg);
+/*
+** File operation sturcture
+*/
+static struct file_operations fops =
+{
+        .owner          = THIS_MODULE,
+        .read           = etx_read,
+        .write          = etx_write,
+        .open           = etx_open,
+        .unlocked_ioctl = etx_ioctl,
+        .release        = etx_release,
+};
+/*
+** This function will be called when we open the Device file
+*/
+static int etx_open(struct inode *inode, struct file *file)
+{
+  //pr_info("Device File Opened...!!!\n");
+        return 0;
+}
+/*
+** This function will be called when we close the Device file
+*/
+static int etx_release(struct inode *inode, struct file *file)
+{
+  //pr_info("Device File Closed...!!!\n");
+        return 0;
+}
+/*
+** This function will be called when we read the Device file
+*/
+static ssize_t etx_read(struct file *filp, char __user *buf, size_t len, loff_t *off)
+{
+        pr_info("Read Function\n");
+        return 0;
+}
+/*
+** This function will be called when we write the Device file
+*/
+static ssize_t etx_write(struct file *filp, const char __user *buf, size_t len, loff_t *off)
+{
+  // pr_info("Write function\n");
+        return len;
+}
+/*
+** This function will be called when we write IOCTL on the Device file
+*/
+static long etx_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+{
+         switch(cmd) {
+                case WR_VALUE:
+                        if( copy_from_user(&value ,(int32_t*) arg, sizeof(value)) )
+                        {
+                                pr_err("Data Write : Err!\n");
+                        }
+                        pr_info("Value = %d\n", value);
+			UE_RNIS_RADIO_BW = value != 0 ? value : UE_RNIS_RADIO_BW;
+                        break;
+                case RD_VALUE:
+                        if( copy_to_user((int32_t*) arg, &value, sizeof(value)) )
+                        {
+                                pr_err("Data Read : Err!\n");
+                        }
+                        break;
+                default:
+                        pr_info("Default\n");
+                        break;
+        }
+        return 0;
+}
+
+static int  etx_driver_init(void)
+{
+        /*Allocating Major number*/
+        if((alloc_chrdev_region(&dev, 0, 1, "etx_Dev")) <0){
+                pr_err("Cannot allocate major number\n");
+                return -1;
+        }
+        pr_info("Major = %d Minor = %d \n",MAJOR(dev), MINOR(dev));
+ 
+        /*Creating cdev structure*/
+        cdev_init(&etx_cdev,&fops);
+ 
+        /*Adding character device to the system*/
+        if((cdev_add(&etx_cdev,dev,1)) < 0){
+            pr_err("Cannot add the device to the system\n");
+            goto r_class;
+        }
+ 
+        /*Creating struct class*/
+        if((dev_class = class_create(THIS_MODULE,"etx_class")) == NULL){
+            pr_err("Cannot create the struct class\n");
+            goto r_class;
+        }
+ 
+        /*Creating device*/
+        if((device_create(dev_class,NULL,dev,NULL,"etx_device")) == NULL){
+            pr_err("Cannot create the Device 1\n");
+            goto r_device;
+        }
+        pr_info("Device Driver Insert...Done!!!\n");
+        return 0;
+ 
+r_device:
+        class_destroy(dev_class);
+r_class:
+        unregister_chrdev_region(dev,1);
+        return -1;
+}
+/*
+**  exit function
+*/
+static void etx_driver_exit(void)
+{
+        device_destroy(dev_class,dev);
+        class_destroy(dev_class);
+        cdev_del(&etx_cdev);
+        unregister_chrdev_region(dev, 1);
+        pr_info("Device Driver Remove...Done!!!\n");
+}
 
 #define NIPQUAD(addr) \
     ((unsigned char *)&addr)[0], \
@@ -339,7 +489,7 @@ bool update_ue_info (struct conn *newconn, struct list_head *listhead){
     ue_key->fc+=1;
     INIT_LIST_HEAD(&ue_key->porttab);
     list_add(&ue_key->list,listhead);
-    printk(KERN_INFO "=== [RAPID ] : Add new UE!! and new port ===\n");
+    //printk(KERN_INFO "=== [RAPID ] : Add new UE!! and new port ===\n");
     update_ue_info(firstconn,&ue_key->porttab);
   }
 
@@ -386,7 +536,7 @@ unsigned int rapid_func_out(unsigned int hooknum,
     sock_buff = skb;
 
     if (!sock_buff) {
-        printk(KERN_INFO " [RAPIDlog] NO_SKBUFF\n");
+      //printk(KERN_INFO " [RAPIDlog] NO_SKBUFF\n");
         return NF_ACCEPT;
     }
 
@@ -412,7 +562,8 @@ unsigned int rapid_func_out(unsigned int hooknum,
 	struct mobile *ue = kmalloc(sizeof(struct mobile), GFP_KERNEL);
 	snprintf(ue->ip,16,"%pI4",&iph->daddr);
 	ue->fc = 0;
-	ue->rbw= DEFAULT_UE_BW;
+	//ue->rbw= DEFAULT_UE_BW;
+	ue->rbw = UE_RNIS_RADIO_BW;
 	ue->unused = 0;
 	add_mobile(ue,mobtab,dport);
         }
@@ -541,6 +692,7 @@ unsigned int rapid_func_in(unsigned int hooknum,
 
 static int __init initialize(void) {
     mobtab = kmalloc(sizeof(struct list_head), GFP_KERNEL);
+    UE_RNIS_RADIO_BW = DEFAULT_UE_BW;
     INIT_LIST_HEAD(mobtab);
     nfho.hook = rapid_func_out;
     nfin.hook = rapid_func_in;
@@ -554,16 +706,31 @@ static int __init initialize(void) {
     nfin.pf = PF_INET;
     nfin.priority = NF_IP_PRI_FIRST;
     nfho.priority = NF_IP_PRI_FIRST;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,13,0)
+    nf_register_net_hook(&init_net,&nfin);
+    nf_register_net_hook(&init_net,&nfho);
+#else
     nf_register_hook(&nfin);
     nf_register_hook(&nfho);
+#endif
+    etx_driver_init();
+    //nf_register_hook(&nfin);
+    //nf_register_hook(&nfho);
     return 0;    
 }
 
 static void __exit teardown(void) {
+    //nf_unregister_hook(&nfho);
+    //nf_unregister_hook(&nfin);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,13,0)
+    nf_unregister_net_hook(&init_net,&nfho);
+    nf_unregister_net_hook(&init_net,&nfin);
+#else
     nf_unregister_hook(&nfho);
     nf_unregister_hook(&nfin);
-
+#endif
     kfree(mobtab);
+    etx_driver_exit();
 }
 
 module_init(initialize);
