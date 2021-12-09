@@ -108,7 +108,7 @@ static long etx_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
                 case WR_VALUE:
                         if( copy_from_user(&value ,(int32_t*) arg, sizeof(value)) )
                         {
-                                pr_err("Data Write : Err!\n");
+			  //pr_err("Data Write : Err!\n");
                         }
                         pr_info("Value = %d\n", value);
 			UE_RNIS_RADIO_BW = value != 0 ? value : UE_RNIS_RADIO_BW;
@@ -116,7 +116,7 @@ static long etx_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
                 case RD_VALUE:
                         if( copy_to_user((int32_t*) arg, &value, sizeof(value)) )
                         {
-                                pr_err("Data Read : Err!\n");
+			  //        pr_err("Data Read : Err!\n");
                         }
                         break;
                 default:
