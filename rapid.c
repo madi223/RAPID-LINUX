@@ -205,6 +205,9 @@ struct conn {
   uint32_t srtt;
   uint32_t rttmin;
   uint32_t rttwan;
+  uint32_t rttran;
+  uint32_t rttran_min;
+  uint32_t srttran;
   u64 epoch;
   u64 elapsed;
   u64 ctime;
@@ -271,6 +274,7 @@ void update_flow_state(struct mobile *ue, struct conn *flow,unsigned int data){
   if((flow->epoch == 0 )&&(flow->srtt > 0)){
     //flow->rttwan = flow->rttmin; // in us
     flow->rttwan = flow->rttmin <= flow->srtt ? flow->rttmin : flow->srtt;
+    flow->rttran = flow->rttran_min <= flow->srttran ? flow->rttran_min : flow->srttran;
     uint64_t init_bdp = ((ue->rbw/ue->fc)*(flow->rttwan)); // /1000000; // initial BDP in MBytes
     //printk(KERN_INFO "[RAPID] #init_bdp1 : %llu rttwan: %u\n",init_bdp,flow->rttwan);
     init_bdp = init_bdp >> 20;                     // initial BDP in Bytes
@@ -332,6 +336,7 @@ void update_flow_state(struct mobile *ue, struct conn *flow,unsigned int data){
       // rediscover RTTmin : I'll keep it for now (might solve the issue with UDP flows)
       //flow->rttwan = flow->rttmin; // in us
       flow->rttwan = flow->rttmin <= flow->srtt ? flow->rttmin : flow->rttwan;
+      flow->rttran = flow->rttran_min <= flow->srttran ? flow->rttran_min : flow->rttran;
       //uint32_t rtt_sample = ((flow->rttmin > 0) && (flow->rttmin <= flow->srtt)) ? flow->rttmin : flow->srtt;
       //flow->rttwan = ((flow->srtt > 0) && (flow->srtt <= flow->rttwan)) ? flow->srtt : flow->rttwan;
       //flow->rttwan = rtt_sample < flow->rttwan ? rtt_sample : flow->rttwan;
@@ -352,7 +357,7 @@ void update_flow_state(struct mobile *ue, struct conn *flow,unsigned int data){
 
 }
 
-struct rflow *find_ue_by_port(int port, struct list_head *listhead){
+struct rflow *find_ue_by_port(int port, int dport, struct list_head *listhead){
   struct list_head *p,*q;
   struct mobile *ue = NULL;
   struct rflow *found = NULL;
@@ -362,7 +367,7 @@ struct rflow *find_ue_by_port(int port, struct list_head *listhead){
       ue = list_entry(p,struct mobile,list);
       list_for_each(q,&ue->porttab){
 	entry = list_entry(q,struct conn,list);
-	if(ipcalc(ue->ip,entry->port)==port){
+	if((ipcalc(ue->ip,entry->port)==port)||(entry->port == dport)){
 	  found = kmalloc(sizeof(struct rflow), GFP_KERNEL);
 	  found->mob = ue;
 	  found->conn_out = entry;
@@ -456,6 +461,9 @@ bool update_ue_info (struct conn *newconn, struct list_head *listhead){
 	ueport->rttwan = 0;
 	ueport->srtt = 0;
 	ueport->rttmin = 0;
+	ueport->rttran = 0;
+        ueport->srttran = 0;
+        ueport->rttran_min = 0;
 	ueport->rwthresh = ((INITIAL_WINDOW)*(DEFAULT_MSS));
 	ueport->mydata = 0;
 	if(ue->fc <=0)
@@ -484,6 +492,9 @@ bool update_ue_info (struct conn *newconn, struct list_head *listhead){
     firstconn->rttwan = 0;
     firstconn->srtt = 0;
     firstconn->rttmin = 0;
+    firstconn->rttran = 0;
+    firstconn->srttran = 0;
+    firstconn->rttran_min = 0;
     firstconn->mydata = 0;
 
     ue_key->fc+=1;
@@ -575,8 +586,8 @@ unsigned int rapid_func_out(unsigned int hooknum,
 	 }
        else {
 	 struct rflow *pep=NULL;
-	 pep = find_ue_by_port(sport,mobtab);
-	 if ((pep != NULL)&&(pep->conn_out != NULL)){
+	 pep = find_ue_by_port(sport,dport,mobtab);
+	 if ((pep != NULL)&&(pep->conn_out != NULL)&&(pep->conn_out->port != dport)){
 
 	struct tcp_sock *tp=NULL;
         if(sock_buff->sk!=NULL){
@@ -608,6 +619,22 @@ unsigned int rapid_func_out(unsigned int hooknum,
 	   //printk(KERN_INFO "[RAPID] OLD window: %d, NEW window: %d \n", window,htons((unsigned short int) tcp_header->window));
 	   //printk(KERN_INFO "[RAPID] OLD window: %d, NEW : %d ; RWthresh: %llu ; isSLOW : %d\n", window,htons((unsigned short int) tcp_header->window),pep->conn_out->rwthresh,pep->conn_out->isSlow /*>>7*/);
 	   }
+	 if ((pep != NULL)&&(pep->conn_out != NULL)&&(pep->conn_out->epoch != 0)&&(pep->conn_out->port == dport)){
+	   struct tcp_sock *tp=NULL;
+           if(sock_buff->sk!=NULL){
+           tp = tcp_sk(sock_buff->sk);
+           if(tp!= NULL ){
+           //printk(KERN_INFO "[RAPID] SRTT :%u ; RTT_min : %u",tp->srtt_us >> 3,minmax_get(&tp->rtt_min));                                                                                  
+           pep->conn_out->srttran = (tp->srtt_us >> 3)/*/1000*/;
+           pep->conn_out->rttran_min = (minmax_get(&tp->rtt_min))/*/1000*/;
+	   uint64_t ranBW = ((pep->mob->rbw/pep->mob->fc)*(pep->conn_out->rttran )) >> 20;
+	   uint32_t ranCWND = (ranBW*3) >> 12;
+	   tp->snd_cwnd = ranCWND;
+	   //printk(KERN_INFO "[RAPID] |CWND| :  SCWND :%u ; PCWND : %u ; LOST : %u",tp->snd_cwnd,tp->prior_cwnd,tp->lost_out);
+           //printk(KERN_INFO "[RAPID] input:  SRTT :%u ; RTT_min : %u ; RTTWAN : %u",pep->conn_out->srtt,pep->conn_out->rttmin,pep->conn_out->rttwan);                                      
+         }
+        }	   
+       }
 	 /*else
 	   printk(KERN_INFO "[RAPIDlog] NOPEP\n");*/
 	}
@@ -658,8 +685,8 @@ unsigned int rapid_func_in(unsigned int hooknum,
 	//struct mobile *ue = kmalloc(sizeof(struct mobile), GFP_KERNEL);
 	//snprintf(ue->ip,16,"%pI4",&iph->daddr);
 	struct rflow *pep=NULL;
-        pep = find_ue_by_port(dport,mobtab);
-         if ((pep != NULL)&&(pep->conn_out != NULL)){
+        pep = find_ue_by_port(dport,sport,mobtab);
+         if ((pep != NULL)&&(pep->conn_out != NULL)&&(pep->conn_out->port != sport)){
         struct tcp_sock *tp=NULL;
 
         if(sock_buff->sk!=NULL){
@@ -680,6 +707,18 @@ unsigned int rapid_func_in(unsigned int hooknum,
 	  //printk(KERN_INFO "[RAPIDcount] DataCOUNT : %d",pep->conn_out->mydata); 
 	  }
       }
+        if ((pep != NULL)&&(pep->conn_out != NULL)&&(pep->conn_out->epoch != 0)&&(pep->conn_out->port == sport)){
+           struct tcp_sock *tp=NULL;
+           if(sock_buff->sk!=NULL){
+           tp = tcp_sk(sock_buff->sk);
+           if(tp!= NULL ){
+           //printk(KERN_INFO "[RAPID] SRTT :%u ; RTT_min : %u",tp->srtt_us >> 3,minmax_get(&tp->rtt_min));                                                                                  
+           pep->conn_out->srttran = (tp->srtt_us >> 3) > 0 ?  (tp->srtt_us >> 3) : pep->conn_out->srttran/*/1000*/;
+           pep->conn_out->rttran_min = (tp->srtt_us >> 3) > 0 ? (minmax_get(&tp->rtt_min)) : pep->conn_out->rttran_min/*/1000*/;
+           //printk(KERN_INFO "[RAPID] input:  SRTT :%u ; RTT_min : %u ; RTTWAN : %u",pep->conn_out->srtt,pep->conn_out->rttmin,pep->conn_out->rttwan);                                      
+         }
+        }
+       }
 	//add_mobile(ue,mobtab,dport);
 	
         }

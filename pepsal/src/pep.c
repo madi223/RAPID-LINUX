@@ -139,15 +139,17 @@ void *rnis_subscribe(void *parg)
 
         int fd;
         fd = open("/dev/etx_device", O_RDWR);
-        if(fd >= 0) {
+        if(fd < 0) {
 	  //printf("Cannot open device file...\n");
           //return 0;
-	  ioctl(fd, WR_VALUE, (int32_t*) &rbw);
-          close(fd);
+	  //ioctl(fd, WR_VALUE, (int32_t*) &rbw);
+          //close(fd);
         }
+	else {
 	
-        //ioctl(fd, WR_VALUE, (int32_t*) &rbw); 
-        //close(fd);
+        ioctl(fd, WR_VALUE, (int32_t*) &rbw); 
+        close(fd);
+	}
     
     //printf("[CQI: %d] [TXQ %d] [TBS %d]",dlcqi,txq,tbsDL);
     
@@ -1499,7 +1501,7 @@ int main(int argc, char *argv[])
           params->cqi=0;
           params->txq=0;
           //printf("hostname [main] = %s",params->hostname);                                                                                                                                 
-          //pthread_create(&thread_id,NULL,rnis_subscribe,params);
+          pthread_create(&thread_id,NULL,rnis_subscribe,params);
  /**************  END AMQP THREAD *******************/
 
     init_pep_queues();
@@ -1512,7 +1514,7 @@ int main(int argc, char *argv[])
     pthread_join(poller, &valptr);
     pthread_join(timer_sch, &valptr);
     //pthread_join(thread_id, &valptr);
-    pthread_create(&thread_id,NULL,rnis_subscribe,params);
+    //pthread_create(&thread_id,NULL,rnis_subscribe,params);
     PEP_DEBUG("exiting...\n");
     closelog();
     return 0;
