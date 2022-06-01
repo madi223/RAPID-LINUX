@@ -1,4 +1,4 @@
-obj-m := rapid.o
+obj-m := rapid.o rapid-llc.o
 
 KDIR := /lib/modules/$(shell uname -r)/build
 PWD := $(shell pwd)

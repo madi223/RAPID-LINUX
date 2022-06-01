@@ -145,12 +145,10 @@ void *rnis_subscribe(void *parg)
 	  //ioctl(fd, WR_VALUE, (int32_t*) &rbw);
           //close(fd);
         }
-	else {
-	
+	else{
         ioctl(fd, WR_VALUE, (int32_t*) &rbw); 
         close(fd);
 	}
-    
     //printf("[CQI: %d] [TXQ %d] [TBS %d]",dlcqi,txq,tbsDL);
     
 
