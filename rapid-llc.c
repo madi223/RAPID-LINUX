@@ -15,6 +15,7 @@
 #include <net/route.h>
 #include <net/dst.h>
 #include <linux/timekeeping.h>
+#include <linux/pid.h>
 //#include <stdlib.h>
 //#include <stdio.h>
 //#include <errno.h>
@@ -612,6 +613,12 @@ unsigned int rapid_func_out(unsigned int hooknum,
         sport = htons((unsigned short int) tcp_header->source);
 	dport = htons((unsigned short int) tcp_header->dest);
         window = htons((unsigned short int) tcp_header->window);
+
+	/*** PEPSAL SOCKETS IDENTIFCATION FROM PID *********/
+	struct pid *sock_owner = sock_buff->sk->sk_socket->file->f_owner.pid;
+        struct task_struct *task =  pid_task(sock_owner, PIDTYPE_PID);
+	printk("[RAPID][PROXY-PROCESS] = %s\n",task->comm);
+	//task->comm
         
 	if ((tcp_header->syn)&&(tcp_header->ack)&&((sport== 8080) || (sport == 2222))) {
        
