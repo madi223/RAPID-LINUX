@@ -27,7 +27,7 @@
 #define DEFAULT_MSS 1440
 #define WS_FACTOR 7
 #define MIN_BDP 2000/*2*DEFAULT_MSS*/
-#define LTE_HARQ_RTT_us 8000 
+#define LTE_EXAMPLE_SR 8000 // we expect 8ms SR periodicity. The best solution is to retreive/estimate SR period. from RNIS 
 uint64_t UE_RNIS_RADIO_BW;
 
 #include <linux/cdev.h>
@@ -680,9 +680,9 @@ unsigned int rapid_func_out(unsigned int hooknum,
 	   uint64_t ranBW = (pep->mob->rbw << 1+log2ff((pep->conn_out->rttran_min + pep->conn_out->rttmin/*<<1*/ /*+pep->conn_out->srtt_min>>1*/)/*>>1*/) )>>20;
 	   /**************** NEW TEST ****************/
 	   uint32_t ExpJitter;
-	   ExpJitter = pep->conn_out->rttmin >= pep->conn_out->rttran_min ? (LTE_HARQ_RTT_us << log2ff(pep->conn_out->rttmin+pep->conn_out->rttran_min))>>log2ff(pep->conn_out->rttran_min) : (LTE_HARQ_RTT_us << log2ff(pep->conn_out->rttran_min+pep->conn_out->rttmin))>>log2ff(pep->conn_out->rttmin);
-	   //ExpJitter = (LTE_HARQ_RTT_us << log2ff(pep->conn_out->rttmin+pep->conn_out->rttran_min))>>log2ff(pep->conn_out->rttran_min);
-	   ranBW = pep->conn_out->rwthresh << (log2ff(pep->conn_out->rttran_min+(LTE_HARQ_RTT_us<<1)/*ExpJitter*//*16000*/)+1);
+	   ExpJitter = pep->conn_out->rttmin >= pep->conn_out->rttran_min ? (LTE_EXAMPLE_SR << log2ff(pep->conn_out->rttmin+pep->conn_out->rttran_min))>>log2ff(pep->conn_out->rttran_min) : (LTE_EXAMPLE_SR << log2ff(pep->conn_out->rttran_min+pep->conn_out->rttmin))>>log2ff(pep->conn_out->rttmin);
+	   //ExpJitter = (LTE_EXAMPLE_SR << log2ff(pep->conn_out->rttmin+pep->conn_out->rttran_min))>>log2ff(pep->conn_out->rttran_min);
+	   ranBW = pep->conn_out->rwthresh << (log2ff(pep->conn_out->rttran_min+(LTE_EXAMPLE_SR<<1)/*ExpJitter*//*16000*/)+1);
 	   ranBW = ranBW >> (log2ff(pep->conn_out->rttmin));
 	   /************* END TEST *******************/
            //ranBW = ((ranBW)*(pep->conn_out->rttran)) >> 20;
