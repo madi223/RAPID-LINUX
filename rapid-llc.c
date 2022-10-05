@@ -615,9 +615,12 @@ unsigned int rapid_func_out(unsigned int hooknum,
         window = htons((unsigned short int) tcp_header->window);
 
 	/*** PEPSAL SOCKETS IDENTIFCATION FROM PID *********/
-	struct pid *sock_owner = sock_buff->sk->sk_socket->file->f_owner.pid;
+	/*struct pid *sock_owner = sock_buff->sk->sk_socket->file->f_owner.pid;
         struct task_struct *task =  pid_task(sock_owner, PIDTYPE_PID);
+
+	if ((task!=NULL)&&(task->comm!=NULL))
 	printk("[RAPID][PROXY-PROCESS] = %s\n",task->comm);
+	*/
 	//task->comm
         
 	if ((tcp_header->syn)&&(tcp_header->ack)&&((sport== 8080) || (sport == 2222))) {
