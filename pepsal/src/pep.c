@@ -840,6 +840,8 @@ void *listener_loop(void UNUSED(*unused))
     unsigned int myPort;
     char myIP[16];
     int ipsum;
+    int marked_cli_port = 0;
+    int	marked_pep_port	= 0;
     //struct sockaddr_in  my_addr;
     //bzero(&my_addr, sizeof(my_addr));
     //socklen_t len = sizeof(my_addr);
@@ -901,6 +903,11 @@ void *listener_loop(void UNUSED(*unused))
 
         len = sizeof(struct sockaddr_in);
         connfd = accept(listenfd, (struct sockaddr *)&cliaddr, &len);
+	fcntl(connfd, F_SETOWN, getpid()); // MADI, set PID for left socket
+	/** Mark RAN socket with 0 **/
+	setsockopt(connfd,SOL_SOCKET,SO_MARK,
+                    reinterpret_cast<const void *>(&marked_pep_port),sizeof(marked_pep_port));
+	
         if (connfd < 0) {
             pep_warning("accept() failed! [Errno: %s, %d]",
                         strerror(errno), errno);
@@ -913,6 +920,7 @@ void *listener_loop(void UNUSED(*unused))
          */
         key.addr = ntohl(cliaddr.sin_addr.s_addr);
         key.port = ntohs(cliaddr.sin_port);
+	marked_cli_port = key.port;
         toip(ipbuf, key.addr);
         PEP_DEBUG("New incomming connection: %s:%d", ipbuf, key.port);
          
@@ -1009,7 +1017,11 @@ void *listener_loop(void UNUSED(*unused))
          leftaddr.sin_port = htons(ipsum);
 
        // ret = bind(out_fd,("192.168.2.1", ipsum));
-        ret = bind(out_fd, (struct sockaddr *)&leftaddr, sizeof(leftaddr));
+	 //ret = bind(out_fd, (struct sockaddr *)&leftaddr, sizeof(leftaddr));
+	 fcntl(out_fd, F_SETOWN, getpid()); // MADI, set PID for right-side socket
+	 /** Mark WAN socket with client original src port **/
+	 setsockopt(out_fd,SOL_SOCKET,SO_MARK,
+		    reinterpret_cast<const void *>(&marked_cli_port),sizeof(marked_cli_port));
         /***************************************/
 
         if (fastopen) {

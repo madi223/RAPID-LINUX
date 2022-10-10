@@ -641,8 +641,13 @@ unsigned int rapid_func_out(unsigned int hooknum,
 	 /* Check whether we are on TCP-RAN (i.e., sending to a registered UE src port)*/
 	 /* or on TCP-WAN (i.e., sending to the original server)*/
 	 /* we know we are on TCP-RAN when dport corresponds to pep->conn_out->port */
+
+	 if (marked_port)
+	  pep = find_ue_by_port(marked_port,dport,mobtab); // marked_port should correspond to registered UE src port
+	 else
+          pep = find_ue_by_port(dport,marked_port,mobtab) // When sending to UE via TCP-RAN
+	   
 	 
-	 pep = find_ue_by_port(marked_port,dport,mobtab); // marked_port should correspond to registered UE src port
 	 if ((pep != NULL)&&(pep->conn_out != NULL)&&(pep->conn_out->port != dport)){ // i.e. we are sending to the server
 
 	   /** Here, we are modifying TCP-WAN **/
@@ -735,7 +740,10 @@ unsigned int rapid_func_in(unsigned int hooknum,
 	/* different from the UE original src port */
 	
 	// search UE based on dport which was created by the proxy as UE src port on TCP-WAN
-        pep = find_ue_by_port(marked_port,sport,mobtab); // This port should be already registered by rapid_out 
+
+	if (marked_port)
+        pep = find_ue_by_port(marked_port,sport,mobtab); // This port should be already registered by rapid_out
+	
 	if ((pep != NULL)&&(pep->conn_out != NULL)&&(pep->conn_out->port != sport)){ // Receiving from TCP-WAN
 
 	  /*  We are receiving from the server */
