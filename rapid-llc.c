@@ -645,7 +645,7 @@ unsigned int rapid_func_out(unsigned int hooknum,
 	 if (marked_port)
 	  pep = find_ue_by_port(marked_port,dport,mobtab); // marked_port should correspond to registered UE src port
 	 else
-          pep = find_ue_by_port(dport,marked_port,mobtab) // When sending to UE via TCP-RAN
+	  pep = find_ue_by_port(dport,marked_port,mobtab); // When sending to UE via TCP-RAN
 	   
 	 
 	 if ((pep != NULL)&&(pep->conn_out != NULL)&&(pep->conn_out->port != dport)){ // i.e. we are sending to the server
