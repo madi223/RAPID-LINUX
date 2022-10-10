@@ -16,13 +16,7 @@
 #include <net/dst.h>
 #include <linux/timekeeping.h>
 #include <linux/pid.h>
-//#include <stdlib.h>
-//#include <stdio.h>
-//#include <errno.h>
-//#include <fcntl.h>
-//#include <dirent.h>
-//#include <string.h>
-//#include <sys/types.h>
+
 #define DEFAULT_UE_BW 2050000 // 2MB/s (16 Mbps)
 #define INITIAL_WINDOW 10
 #define DEFAULT_MSS 1440
@@ -213,6 +207,17 @@ bool is_pepsal(struct sk_buff *sock_buff){
     ret = cmp_ret == 0 ? true : false;
   }
   return ret;
+}
+
+unsigned int ue_port_from_socket_option(struct sk_buff *sock_buff){
+  unsigned int my_sock_mark = 0;
+  if (sock_buff->sk->sk_socket != NULL){
+    struct socket *mysock = sock_buff->sk->sk_socket;
+    struct sock *sk = mysock->sk;
+    if (sk != NULL)
+      my_sock_mark = sk->sk_mark;
+  }
+  return my_sock_mark;
 }
 
 struct list_head *mobtab;
@@ -406,7 +411,7 @@ struct rflow *find_ue_by_port(int port, int dport, struct list_head *listhead){
       ue = list_entry(p,struct mobile,list);
       list_for_each(q,&ue->porttab){
 	entry = list_entry(q,struct conn,list);
-	if( entry->port == port)||(entry->port == dport)){
+	if(( entry->port == port)||(entry->port == dport)){
 	  found = kmalloc(sizeof(struct rflow), GFP_KERNEL);
 	  found->mob = ue;
 	  found->conn_out = entry;
@@ -631,12 +636,13 @@ unsigned int rapid_func_out(unsigned int hooknum,
 	 }
        else { // Spoofed SYN or data towards server or data towards UE 
 	 struct rflow *pep=NULL;
-	 
+	 unsigned int marked_port = 0; // gives UE src port associated to TCP-WAN socket
+	 marked_port = ue_port_from_socket_option(sock_buff);
 	 /* Check whether we are on TCP-RAN (i.e., sending to a registered UE src port)*/
 	 /* or on TCP-WAN (i.e., sending to the original server)*/
 	 /* we know we are on TCP-RAN when dport corresponds to pep->conn_out->port */
 	 
-	 pep = find_ue_by_port(sport,dport,mobtab);
+	 pep = find_ue_by_port(marked_port,dport,mobtab); // marked_port should correspond to registered UE src port
 	 if ((pep != NULL)&&(pep->conn_out != NULL)&&(pep->conn_out->port != dport)){ // i.e. we are sending to the server
 
 	   /** Here, we are modifying TCP-WAN **/
@@ -721,13 +727,15 @@ unsigned int rapid_func_in(unsigned int hooknum,
         dport = htons((unsigned short int) tcp_header->dest);
         window = htons((unsigned short int) tcp_header->window);
 	struct rflow *pep=NULL;
+	unsigned int marked_port = 0; // gives UE src port associated to TCP-WAN socket                                                
+	marked_port = ue_port_from_socket_option(sock_buff);
 	
 	/* Want to know if we are receiving from TCP-WAN */
 	/* We are receiving from TCP-WAN when the src port is */
 	/* different from the UE original src port */
 	
 	// search UE based on dport which was created by the proxy as UE src port on TCP-WAN
-        pep = find_ue_by_port(dport,sport,mobtab); // This port should be already registered by rapid_out 
+        pep = find_ue_by_port(marked_port,sport,mobtab); // This port should be already registered by rapid_out 
 	if ((pep != NULL)&&(pep->conn_out != NULL)&&(pep->conn_out->port != sport)){ // Receiving from TCP-WAN
 
 	  /*  We are receiving from the server */
