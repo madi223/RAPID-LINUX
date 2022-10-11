@@ -1,0 +1,61 @@
+#!/bin/bash
+
+function install_pistache {
+    echo "Installing pistache"
+    git clone https://github.com/oktal/pistache.git
+    cd pistache || exit
+    mkdir build
+    cd build
+    cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release ..
+    make
+    sudo make install
+    cd -
+}
+
+function install_neo4j {
+    sudo add-apt-repository ppa:cleishm/neo4j
+    sudo apt-get update
+    sudo apt-get install neo4j-client libneo4j-client-dev
+}
+
+
+function install_protobuf {
+    echo "Installing protobuf"
+    wget https://github.com/google/protobuf/releases/download/v3.3.0/protobuf-cpp-3.3.0.tar.gz
+    tar -xzvf protobuf-cpp-3.3.0.tar.gz
+    cd protobuf-3.3.0/ || exit
+    ./configure
+    make -j$(nproc)
+    sudo make install
+    sudo ldconfig
+    cd -
+}
+
+function main() {
+  os_version=$(awk -F= '/^NAME/{print $2}' /etc/os-release)
+  if [[ $os_version != *"Ubuntu"* ]]; then
+    echo "This script is only for Ubuntu Linux, see the README for a list of"
+    echo "required packages"
+    exit 1
+  fi
+
+  # update the system
+  sudo apt-get update -y
+  # install some basic things needed to compile
+  sudo apt-get install build-essential g++ git cmake autoconf \
+                       automake libtool curl make g++ -y
+
+  # install our Boost dependencies
+  sudo apt-get install libboost-system-dev libboost-program-options-dev  -y
+  # install our LOG4CXX dependencies
+  sudo apt-get install liblog4cxx-dev liblog4cxx10v5 -y
+  # install our libcurl dependency
+  sudo apt-get install libcurl4-openssl-dev -y
+  # install protobuf
+  install_protobuf
+
+  install_pistache
+  #install_neo4j # the Neo4j FlexRAN app is not actively maintained anymore
+}
+
+main "$@"

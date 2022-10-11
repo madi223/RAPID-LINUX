@@ -1,0 +1,2 @@
+/usr/bin/ar qc libRTC_RIB_LIB.a CMakeFiles/RTC_RIB_LIB.dir/agent_info.cc.o CMakeFiles/RTC_RIB_LIB.dir/cell_mac_rib_info.cc.o CMakeFiles/RTC_RIB_LIB.dir/enb_rib_info.cc.o CMakeFiles/RTC_RIB_LIB.dir/rib.cc.o CMakeFiles/RTC_RIB_LIB.dir/rib_common.cc.o CMakeFiles/RTC_RIB_LIB.dir/rib_updater.cc.o CMakeFiles/RTC_RIB_LIB.dir/ue_mac_rib_info.cc.o
+/usr/bin/ranlib libRTC_RIB_LIB.a

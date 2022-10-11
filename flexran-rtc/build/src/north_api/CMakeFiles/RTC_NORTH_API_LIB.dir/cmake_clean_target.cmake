@@ -1,0 +1,3 @@
+file(REMOVE_RECURSE
+  "libRTC_NORTH_API_LIB.a"
+)

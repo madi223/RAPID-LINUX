@@ -1,0 +1,2 @@
+/usr/bin/ar qc libRTC_NETWORK_LIB.a CMakeFiles/RTC_NETWORK_LIB.dir/async_xface.cc.o CMakeFiles/RTC_NETWORK_LIB.dir/connection_manager.cc.o CMakeFiles/RTC_NETWORK_LIB.dir/agent_session.cc.o CMakeFiles/RTC_NETWORK_LIB.dir/protocol_message.cc.o CMakeFiles/RTC_NETWORK_LIB.dir/tagged_message.cc.o
+/usr/bin/ranlib libRTC_NETWORK_LIB.a

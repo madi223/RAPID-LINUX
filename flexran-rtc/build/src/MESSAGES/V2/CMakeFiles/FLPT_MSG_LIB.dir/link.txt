@@ -1,0 +1,2 @@
+/usr/bin/ar qc libFLPT_MSG_LIB.a CMakeFiles/FLPT_MSG_LIB.dir/config_common.pb.cc.o CMakeFiles/FLPT_MSG_LIB.dir/config_messages.pb.cc.o CMakeFiles/FLPT_MSG_LIB.dir/control_delegation.pb.cc.o CMakeFiles/FLPT_MSG_LIB.dir/controller_commands.pb.cc.o CMakeFiles/FLPT_MSG_LIB.dir/flexran.pb.cc.o CMakeFiles/FLPT_MSG_LIB.dir/header.pb.cc.o CMakeFiles/FLPT_MSG_LIB.dir/mac_primitives.pb.cc.o CMakeFiles/FLPT_MSG_LIB.dir/stats_common.pb.cc.o CMakeFiles/FLPT_MSG_LIB.dir/stats_messages.pb.cc.o CMakeFiles/FLPT_MSG_LIB.dir/time_common.pb.cc.o
+/usr/bin/ranlib libFLPT_MSG_LIB.a

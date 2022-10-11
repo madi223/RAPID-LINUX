@@ -1,0 +1,2 @@
+/usr/bin/ar qc libRTC_NORTH_API_LIB.a CMakeFiles/RTC_NORTH_API_LIB.dir/call_manager.cc.o CMakeFiles/RTC_NORTH_API_LIB.dir/plmn_calls.cc.o CMakeFiles/RTC_NORTH_API_LIB.dir/rrm_calls.cc.o CMakeFiles/RTC_NORTH_API_LIB.dir/stats_manager_calls.cc.o CMakeFiles/RTC_NORTH_API_LIB.dir/rrc_triggering_calls.cc.o CMakeFiles/RTC_NORTH_API_LIB.dir/recorder_calls.cc.o CMakeFiles/RTC_NORTH_API_LIB.dir/elastic_calls.cc.o
+/usr/bin/ranlib libRTC_NORTH_API_LIB.a

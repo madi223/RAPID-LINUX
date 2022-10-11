@@ -1,0 +1,2 @@
+/usr/bin/ar qc libRTC_CORE_LIB.a CMakeFiles/RTC_CORE_LIB.dir/rt_wrapper.cc.o CMakeFiles/RTC_CORE_LIB.dir/task_manager.cc.o CMakeFiles/RTC_CORE_LIB.dir/rt_task.cc.o CMakeFiles/RTC_CORE_LIB.dir/requests_manager.cc.o
+/usr/bin/ranlib libRTC_CORE_LIB.a

@@ -1,0 +1,3 @@
+file(REMOVE_RECURSE
+  "libRTC_RIB_LIB.a"
+)

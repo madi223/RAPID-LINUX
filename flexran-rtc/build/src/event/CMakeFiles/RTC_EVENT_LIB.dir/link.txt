@@ -1,0 +1,2 @@
+/usr/bin/ar qc libRTC_EVENT_LIB.a CMakeFiles/RTC_EVENT_LIB.dir/subscription.cc.o
+/usr/bin/ranlib libRTC_EVENT_LIB.a

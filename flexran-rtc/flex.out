@@ -1,0 +1,10 @@
+[INFO][FLEXRAN_RTC] - Listening on port 2210 for incoming agent connections
+[WARN][APP] - task_manager: loop duration was 137114 us
+[INFO][FLEXRAN_RTC] - Listening on port 9999 for incoming REST connections
+[INFO][RIB] - New agent connection established (agent ID 0), sending hello
+[WARN][RIB] - Agent 0 with illegal BS ID 0, assigned BS ID 10000
+[INFO][RIB] - Agent 0: hello BS 10000, capabilities [LOPHY,HIPHY,LOMAC,HIMAC,RLC,PDCP,SDAP,RRC,S1AP]
+[INFO][RIB] - New BS 10000, creating RIB entry
+[INFO][APP] - Sent periodical stats request to BS 10000 (xid 0)
+[INFO][RIB] - BS 10000: UE RNTI 13204 activated
+[INFO][RIB] - BS 10000: UE RNTI 13204 updated
