@@ -905,8 +905,7 @@ void *listener_loop(void UNUSED(*unused))
         connfd = accept(listenfd, (struct sockaddr *)&cliaddr, &len);
 	fcntl(connfd, F_SETOWN, getpid()); // MADI, set PID for left socket
 	/** Mark RAN socket with 0 **/
-	setsockopt(connfd,SOL_SOCKET,SO_MARK,
-                    reinterpret_cast<const void *>(&marked_pep_port),sizeof(marked_pep_port));
+	setsockopt(connfd,SOL_SOCKET,SO_MARK,reinterpret_cast<const void *>(&marked_pep_port),sizeof(marked_pep_port));
 	
         if (connfd < 0) {
             pep_warning("accept() failed! [Errno: %s, %d]",
@@ -1020,8 +1019,7 @@ void *listener_loop(void UNUSED(*unused))
 	 //ret = bind(out_fd, (struct sockaddr *)&leftaddr, sizeof(leftaddr));
 	 fcntl(out_fd, F_SETOWN, getpid()); // MADI, set PID for right-side socket
 	 /** Mark WAN socket with client original src port **/
-	 setsockopt(out_fd,SOL_SOCKET,SO_MARK,
-		    reinterpret_cast<const void *>(&marked_cli_port),sizeof(marked_cli_port));
+	 setsockopt(out_fd,SOL_SOCKET,SO_MARK,reinterpret_cast<const void *>(&marked_cli_port),sizeof(marked_cli_port));
         /***************************************/
 
         if (fastopen) {
