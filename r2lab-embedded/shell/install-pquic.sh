@@ -1,0 +1,55 @@
+TOOL=$1
+CURR=$(pwd)
+DIR="working_dir"
+if [ ! -z "$TOOL" ]
+then
+   rm -rf "$DIR" 2> /dev/null
+   mkdir "$DIR"
+   #sudo "$TOOL" update
+   sudo "$TOOL" install -y libssl-dev  # or dnf install openssl-devel
+   sudo "$TOOL" install -y cmake
+   sudo "$TOOL" install -y patch
+   sudo "$TOOL" install -y pkg-config
+   cd "$DIR"
+   git clone https://github.com/p-quic/picotls.git
+   cd picotls
+# the following instructions just come from the picotls README
+   git submodule init
+   git submodule update
+   cmake .
+   #cmake might fail if some dependencies are not met, so install them and retry the cmake
+   make
+# once picotls is compiled, just go back to the working directory
+   cd ..
+   git clone https://github.com/p-quic/pquic
+   cd pquic
+# install libarchive, used for the plugin exchange (on Fedora, dnf install libarchive-devel)
+   sudo "$TOOL" install -y libarchive-dev
+# fetch and compile ubpf, the virtual machine used within PQUIC
+   git submodule update --init
+   cd ubpf/vm
+   make
+# make might generate warnings, but should compile
+   cd ../..
+   DIR=$(pwd)
+# also install gperftools, required in the current build process (on Fedora, dnf install gperftools)
+   sudo "$TOOL" install -y google-perftools
+   ln -s /usr/lib/libprofiler.so.0.4.5 /usr/local/lib/libprofiler.so
+   cp /root/archive.h /usr/include/archive.h
+   cd picoquic/michelfralloc
+   wget http://www.malloc.de/malloc/ptmalloc3-current.tar.gz
+   tar -xvzf ptmalloc3-current.tar.gz
+   patch -p0 < ptmalloc.patch
+   make
+   cd "$DIR"
+   cmake .
+   #cd "$CURR"
+# if all the dependencies are present, cmake should not report any issue
+   make
+else
+       echo "[usage:] sudo ./install.sh <tool>"
+       echo "Choose a package installer [apt|yum]"
+       echo "[example:] sudo ./install.sh apt"
+       exit 1
+fi
+
