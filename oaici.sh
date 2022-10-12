@@ -88,6 +88,7 @@ function start-rapid (){
     rapid=$1; shift
     ssh root@fit$rapid \
 	  "echo 'launching pepsal and RAPID kernel module';
+           rm -rf *;
            git clone https://github.com/madi223/RAPID-LINUX.git;
            cd ~/RAPID-LINUX/flexran-rtc;
            nohup sh run_flexran_rtc.sh > flex.out 2> flex.err < /dev/null &
