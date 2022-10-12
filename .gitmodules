@@ -1,0 +1,3 @@
+[submodule "r2lab-embedded"]
+	path = r2lab-embedded
+	url = /home/madi/RAPID-LINUX/r2lab-embedded
