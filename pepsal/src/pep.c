@@ -741,6 +741,10 @@ static int save_proxy_from_socket(int sockfd, struct sockaddr_in cliaddr)
     int id = 0, ret, added = 0;
     struct sockaddr_in orig_dst;
     int addrlen = sizeof(orig_dst);
+    
+    /** Mark RAN socket with 255 **/
+    int marked_pep_port = 255;
+        setsockopt(sockfd,SOL_SOCKET,SO_MARK,(void *)(&marked_pep_port),sizeof(marked_pep_port));
 
     PEP_DEBUG("Saving new SYN...");
 
@@ -840,8 +844,8 @@ void *listener_loop(void UNUSED(*unused))
     unsigned int myPort;
     char myIP[16];
     int ipsum;
-    int marked_cli_port = 0;
-    int	marked_pep_port	= 0;
+    int marked_cli_port = 255;
+    int	marked_pep_port	= 255;
     //struct sockaddr_in  my_addr;
     //bzero(&my_addr, sizeof(my_addr));
     //socklen_t len = sizeof(my_addr);
@@ -852,6 +856,9 @@ void *listener_loop(void UNUSED(*unused))
     if (listenfd < 0) {
         pep_error("Failed to create listener socket!");
     }
+    
+    /** Mark RAN socket with 255 **/
+        setsockopt(listenfd,SOL_SOCKET,SO_MARK,(void *)(&marked_pep_port),sizeof(marked_pep_port));
 
     PEP_DEBUG("Opened listener socket: %d", listenfd);
     memset(&servaddr, 0, sizeof(servaddr));
@@ -883,7 +890,9 @@ void *listener_loop(void UNUSED(*unused))
           pep_error("Failed to set TCP_FASTOPEN option! [RET = %d]", ret);
       }
     }
-
+    
+    /** Mark RAN socket with 255 **/
+        setsockopt(listenfd,SOL_SOCKET,SO_MARK,(void *)(&marked_pep_port),sizeof(marked_pep_port));
     ret = bind(listenfd, (struct sockaddr *)&servaddr, sizeof(servaddr));
     if (ret < 0) {
         pep_error("Failed to bind socket! [RET = %d]", ret);
@@ -895,6 +904,10 @@ void *listener_loop(void UNUSED(*unused))
                   LISTENER_QUEUE_SIZE, ret);
     }
 
+   fcntl(listenfd, F_SETOWN, getpid()); // MADI, set PID for left socket
+        /** Mark RAN socket with 255 **/
+        setsockopt(listenfd,SOL_SOCKET,SO_MARK,(void *)(&marked_pep_port),sizeof(marked_pep_port));
+
     /* Accept loop */
     PEP_DEBUG("Entering lister main loop...");
     for (;;) {
@@ -904,7 +917,7 @@ void *listener_loop(void UNUSED(*unused))
         len = sizeof(struct sockaddr_in);
         connfd = accept(listenfd, (struct sockaddr *)&cliaddr, &len);
 	fcntl(connfd, F_SETOWN, getpid()); // MADI, set PID for left socket
-	/** Mark RAN socket with 0 **/
+	/** Mark RAN socket with 255 **/
 	setsockopt(connfd,SOL_SOCKET,SO_MARK,(void *)(&marked_pep_port),sizeof(marked_pep_port));
 	
         if (connfd < 0) {
@@ -1021,6 +1034,12 @@ void *listener_loop(void UNUSED(*unused))
 	 /** Mark WAN socket with client original src port **/
 	 setsockopt(out_fd,SOL_SOCKET,SO_MARK,(void *)(&marked_cli_port),sizeof(marked_cli_port));
         /***************************************/
+        int mymark = 0;
+        unsigned int optlen = sizeof(int);
+        getsockopt(out_fd, SOL_SOCKET,SO_MARK,/*reinterpret_cast<void *>*/(void *)(&mymark), &optlen);
+        PEP_DEBUG("[SOCK][MARK]: WAN MARK = %d", mymark);
+        //std::cout<<"[SOCK][MARK]: Mark = "<<static_cast<int>(mymark)<<std::endl;
+        /********** END TEST *******************/ 
 
         if (fastopen) {
           ret = sendto(out_fd, PEPBUF_WPOS(&proxy->src.buf), 0, MSG_FASTOPEN,

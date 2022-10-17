@@ -199,18 +199,26 @@ uint64_t mymax(uint64_t a, uint64_t b){
 bool is_pepsal(struct sk_buff *sock_buff){
   bool ret = false;
   int cmp_ret = 1;
-  if(sock_buff->sk->sk_socket->file != NULL){
-    struct task_struct *task = NULL;
+  unsigned int my_sock_mark = 0;
+  if((sock_buff!=NULL)&&(sock_buff->sk!=NULL))
+  if(sock_buff->sk->sk_socket != NULL){
+    /*struct task_struct *task = NULL;
     struct file *sock_file = sock_buff->sk->sk_socket->file;
     task = sock_file->f_owner.pid != NULL ? get_pid_task(sock_file->f_owner.pid, PIDTYPE_PID) : task;
-    cmp_ret = task != NULL ? strcmp(PEPSAL_PROCESS_NAME,task->comm) : cmp_ret;
-    ret = cmp_ret == 0 ? true : false;
+    cmp_ret = task != NULL ? strcmp(PEPSAL_PROCESS_NAME,task->comm) : cmp_ret;*/
+    
+    struct socket *mysock = sock_buff->sk->sk_socket;
+    struct sock *sk = mysock->sk;
+    if (sk != NULL)
+      my_sock_mark = sk->sk_mark;
+    ret = my_sock_mark >= 1 ? true : false;
   }
   return ret;
 }
 
 unsigned int ue_port_from_socket_option(struct sk_buff *sock_buff){
   unsigned int my_sock_mark = 0;
+  if((sock_buff!=NULL)&&(sock_buff->sk!=NULL))
   if (sock_buff->sk->sk_socket != NULL){
     struct socket *mysock = sock_buff->sk->sk_socket;
     struct sock *sk = mysock->sk;
@@ -642,7 +650,7 @@ unsigned int rapid_func_out(unsigned int hooknum,
 	 /* or on TCP-WAN (i.e., sending to the original server)*/
 	 /* we know we are on TCP-RAN when dport corresponds to pep->conn_out->port */
 
-	 if (marked_port)
+	 if ((marked_port)&&(marked_port != 255))
 	  pep = find_ue_by_port(marked_port,dport,mobtab); // marked_port should correspond to registered UE src port
 	 else
 	  pep = find_ue_by_port(dport,marked_port,mobtab); // When sending to UE via TCP-RAN
@@ -686,7 +694,8 @@ unsigned int rapid_func_out(unsigned int hooknum,
 	   ranBW = pep->conn_out->rwthresh << (log2ff(pep->conn_out->rttran_min+(LTE_EXAMPLE_SR<<1))+1);
 	   ranBW = ranBW >> (log2ff(pep->conn_out->rttmin));
 	   uint32_t ranCWND = ranBW >> log2ff(pep->conn_out->mss);
-	   tp->snd_cwnd = mymax(10,ranCWND);           
+	   tp->snd_cwnd = mymax(10,ranCWND);
+           //printk(KERN_INFO "[RAPID][MOD-RAN] TCP: source: %d, dest: %d, CWND: %d \n", sport, dport,tp->snd_cwnd);           
          }
         }	   
        }
@@ -724,7 +733,23 @@ unsigned int rapid_func_in(unsigned int hooknum,
     if((iph->protocol==IPPROTO_TCP)&& (is_pepsal(sock_buff))) {
                 
         tcp_header = tcp_hdr(sock_buff);
-        
+        if((tcp_header->syn)&&(!tcp_header->ack)){
+        char source[16];
+        snprintf(source, 16, "%pI4", &iph->daddr);
+        sport = htons((unsigned short int) tcp_header->source);
+        dport = htons((unsigned short int) tcp_header->dest);
+        window = htons((unsigned short int) tcp_header->window);
+
+        struct mobile *ue = kmalloc(sizeof(struct mobile), GFP_KERNEL);
+        snprintf(ue->ip,16,"%pI4",&iph->saddr);
+        ue->fc = 0;
+        //ue->rbw= DEFAULT_UE_BW;
+        ue->rbw = UE_RNIS_RADIO_BW;
+        ue->unused = 0;
+        add_mobile(ue,mobtab,sport); // This sport port corresponds to the original UE src port
+        //printk(KERN_INFO "[RAPID] NEW UE == TCP: source: %d, dest: %d, window: %d \n",sport,dport,window);
+        // printk(KERN_INFO "[RAPID] Added NEW from TCPin SYN == TCP: source: %d, dest: %d, window: %d \n",sport,dport,window);
+        }
 	if  ((!tcp_header->syn)) { // Here we want to extract  metrics from received TCP-WAN segments
         char source[16];
         snprintf(source, 16, "%pI4", &iph->daddr); 
@@ -741,7 +766,7 @@ unsigned int rapid_func_in(unsigned int hooknum,
 	
 	// search UE based on dport which was created by the proxy as UE src port on TCP-WAN
 
-	if (marked_port)
+	if ((marked_port)&&(marked_port != 255))
         pep = find_ue_by_port(marked_port,sport,mobtab); // This port should be already registered by rapid_out
 	
 	if ((pep != NULL)&&(pep->conn_out != NULL)&&(pep->conn_out->port != sport)){ // Receiving from TCP-WAN
