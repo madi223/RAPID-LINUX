@@ -94,8 +94,9 @@ function start-rapid (){
            nohup sh run_flexran_rtc.sh > flex.out 2> flex.err < /dev/null &
            cd ~/RAPID-LINUX/pepsal/;
            make;
-           sh pepconf.sh;
+           make install;
            cd ~/RAPID-LINUX/;
+           sh pepconf.sh;
            nohup python3 pub_stat.py > rnis.out 2> rnis.err < /dev/null &
            pepsal -d -l /root/pep.log -v;
            make;

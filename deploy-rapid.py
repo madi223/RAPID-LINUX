@@ -45,7 +45,7 @@ default_load_images = True
 default_epc_image = "oai-ci-cd-u18-epc-latest"
 default_enb_image = "oai-ci-u18-lowlatency-enb-ue-docker-latest"
 default_quectel_image = "ue-quic32.llc"#"u20.04-quectel"
-default_rapid_image = "_RAPID-eki26-minRTT-2Harq.v1"#"u18-lowlat-rabbitmq"
+default_rapid_image = "u18-lowlat-rabbitmq"#"_RAPID-eki26-minRTT-2Harq.v1"#"u18-lowlat-rabbitmq"
 default_server_image = "quic-udp-gen.llc"
 
 ##########
@@ -347,6 +347,13 @@ def run(*, gateway, slicename,
         required=start_enb,
         sleep=120,#50
         label="sleep 50s for the eNB to start up"
+    )
+    wait_rapid_ready = PrintJob(
+        "Let RAPID to start up",
+        scheduler=scheduler,
+        required=start_rapid,
+        sleep=120,#50                                                                                           
+        label="sleep 120s for RAPID to start up"
     )
     
     ########## Test phone(s) connectivity
