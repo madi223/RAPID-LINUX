@@ -69,7 +69,7 @@ async def send():
         dlcqi = 0
         tbsDL = 0
         prbDL = 0
-        if len(obj)>1:
+        if len(obj)>1 and len(obj['eNB_config'])>1:
             test = obj['eNB_config'][0]['eNB']['cellConfig'][0]['dlBandwidth']
             print(test)
             cellPRB = obj['eNB_config'][0]['eNB']['cellConfig'][0]['dlBandwidth']
@@ -97,6 +97,9 @@ async def send():
                 print ("[dlCQI]={},[txQ]={},[tbsDL]={},[prbDL]={},[cellPRB]={},[PRBu]={},[TBSu]={}".format(CqiUE,0,TbsDL,FreePRB,cellPRB,PrbUE,TbsUE))
                 channel_info = str(CqiUE)+","+str(0)+","+str(TbsDL)+","+str(PrbUE)
                 await channel.basic_publish(payload=channel_info,exchange_name='',routing_key='hello')
+        else:
+            channel_info = str(0)+","+str(0)+","+str(0)+","+str(0)
+            await channel.basic_publish(payload=channel_info,exchange_name='',routing_key='hello')
     await protocol.close()
     transport.close()
             
