@@ -97,9 +97,7 @@ async def send():
                 print ("[dlCQI]={},[txQ]={},[tbsDL]={},[prbDL]={},[cellPRB]={},[PRBu]={},[TBSu]={}".format(CqiUE,0,TbsDL,FreePRB,cellPRB,PrbUE,TbsUE))
                 channel_info = str(CqiUE)+","+str(0)+","+str(TbsDL)+","+str(PrbUE)
                 await channel.basic_publish(payload=channel_info,exchange_name='',routing_key='hello')
-        else:
-            channel_info = str(0)+","+str(0)+","+str(0)+","+str(0)
-            await channel.basic_publish(payload=channel_info,exchange_name='',routing_key='hello')
+    
     await protocol.close()
     transport.close()
             

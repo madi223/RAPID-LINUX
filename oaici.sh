@@ -88,17 +88,14 @@ function start-rapid (){
     rapid=$1; shift
     ssh root@fit$rapid \
 	  "echo 'launching pepsal and RAPID kernel module';
-           rm -rf *;
+           rm -rf RAPID-LINUX;
            git clone https://github.com/madi223/RAPID-LINUX.git;
-           cd ~/RAPID-LINUX/flexran-rtc;
+           cd /root/RAPID-LINUX/flexran-rtc;
            nohup sh run_flexran_rtc.sh > flex.out 2> flex.err < /dev/null &
-           cd ~/RAPID-LINUX/pepsal/;
+           cd /root/RAPID-LINUX/pepsal/;
            make;
            make install;
-           cd ~/RAPID-LINUX/;
-           sh pepconf.sh;
-           nohup python3 pub_stat.py > rnis.out 2> rnis.err < /dev/null &
-           pepsal -d -l /root/pep.log -v;
+           cd /root/RAPID-LINUX/;
            make;
            insmod rapid-llc.ko;"
     }
