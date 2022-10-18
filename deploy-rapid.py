@@ -45,7 +45,7 @@ default_load_images = True
 default_epc_image = "oai-ci-cd-u18-epc-latest"
 default_enb_image = "oai-ci-u18-lowlatency-enb-ue-docker-latest"
 default_quectel_image = "ue-quic32.llc"#"u20.04-quectel"
-default_rapid_image = "u18-lowlat-rabbitmq"#"_RAPID-eki26-minRTT-2Harq.v1"#"u18-lowlat-rabbitmq"
+default_rapid_image ="_RAPID-eki26-minRTT-2Harq.v1"#"ubuntu-18-boot-4.10-generic"#"u18-lowlat-rabbitmq"#"_RAPID-eki26-minRTT-2Harq.v1"#"u18-lowlat-rabbitmq"
 default_server_image = "quic-udp-gen.llc"
 
 ##########

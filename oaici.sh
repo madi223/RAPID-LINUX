@@ -80,6 +80,7 @@ function init-rapid (){
             tc qdisc add dev control root netem delay 4ms;
             docker start rabbitmq;
             sysctl -w net.ipv4.tcp_congestion_control=reno;
+            sh pepconf.sh;
             ip route change 192.168.3.0/24 dev control proto static initrwnd 80;"
             
 }
@@ -88,13 +89,8 @@ function start-rapid (){
     rapid=$1; shift
     ssh root@fit$rapid \
 	  "echo 'launching pepsal and RAPID kernel module';
-           rm -rf RAPID-LINUX;
-           git clone https://github.com/madi223/RAPID-LINUX.git;
-           cd /root/RAPID-LINUX/flexran-rtc;
+           cd flexran-rtc;
            nohup sh run_flexran_rtc.sh > flex.out 2> flex.err < /dev/null &
-           cd /root/RAPID-LINUX/pepsal/;
-           make;
-           make install;
            cd /root/RAPID-LINUX/;
            make;
            insmod rapid-llc.ko;"
