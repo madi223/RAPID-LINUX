@@ -2,6 +2,14 @@
 RAPID implementation in Linux: Using pepsal for TCP-split and a new kernel module (rapid.ko) that implements RAPID's algorithms
 <img src="r2lab-testbed.png" alt="OAI r2lab testbed"/>
 <br/>
+# 0. Initial step : Build the testbed on R2LAB
+Clone this repository and launch the deployment script. This may take several minutes.
+
+```
+git clone https://github.com/madi223/RAPID-LINUX.git
+cd RAPID-LINUX
+python3 deploy-rapid.py -s inria_quic -P0 -Q32
+```
 # 1. Subscribing to FlexRAN RNIS and Launching Pepsal
 
 ## 1.1 Subscribe to FlexRAN RNIS
