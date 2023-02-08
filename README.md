@@ -55,5 +55,51 @@ ip route add 22.22.22.0/24 dev wwan0
 wget http://22.22.22.2:80/60M --report-speed=bits --delete-after -O /dev/null -o cubic.001.log & wget http://22.22.22.3:80/60M --report-speed=bits --delete-after -O /dev/null -o bbr.001.log
 
 ```
-Once the download is complete, go back to fit07 and fit19 and stop the recording (i.e., Ctrl+c).Thenyou will find a log file named **rtt.res.csv**. This file contains relevant information about each connection and contains the following field: 
+Once the download is complete, go back to fit07 and fit19 and stop the recording (i.e., Ctrl+c).Thenyou will find a log file named **rtt.res.csv**. This file contains relevant information about each connection and contains the following field: port,rtt,srtt,rttmin,cwnd,unacked_bytes.
+
+# 3. Launching RAPID intercepted HTTP traffic from Quectel UE
+
+## 3.1. Build and load the RAPID kernel module
+Connect to the RAPID node (fit26), then launch the following commands:
+
+```
+ssh root@fit26
+cd RAPID-LINUX
+make
+insmod rapid-llc.ko
+```
+## 3.2. Advertise FlexRAN info on the local Rabbit-mq broker
+On the previous terminal (fit26), launch the following python commands:
+
+```
+cd /root/
+python3 pub_stat.py
+```
+## 3.3. Configure and launch pepsal TCP-split proxy
+Open a new terminal on the RAPID node (fit26), then launch the following commands:
+
+```
+ssh root@fit26
+./pepconf.sh
+pepsal -d -v -l /root/pep.log
+```
+
+## 3.4. Record CWND and RTT traces
+Connect to the RAPID node (fit26) on another terminal, then launch the script that records CWND and RTT traces:
+
+```
+ssh root@fit26
+./getRTT.sh 192.168.3.17
+```
+
+## 3.5 Launch wget from the UE
+Connect to the Quectel UE (fit32). Set up routes to reach the servers via radio interface, and download data from the Cubic and BBR servers at the same time using wget. In this scenario, you have to use the intercepted HTTP port (i.e., 8080 , as indicated in pepconf.sh). 
+
+```
+ssh root@fit32
+ip route add 22.22.22.0/24 dev wwan0
+wget http://22.22.22.2:8080/60M --report-speed=bits --delete-after -O /dev/null -o cubic.rapid.001.log & wget http://22.22.22.3:8080/60M --report-speed=bits --delete-after -O /dev/null -o bbr.rapid.001.log
+
+```
+Once the download is complete, go back to fit26 and stop the recording (i.e., Ctrl+c).Thenyou will find a log file named **rtt.res.csv**. This file contains relevant information about each intercepted connection (port,rtt,srtt,rttmin,cwnd,unacked_bytes).
 
