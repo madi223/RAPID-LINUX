@@ -13,8 +13,8 @@ from asyncssh.logging import set_log_level as asyncssh_set_log_level
 
 from asynciojobs import Job, Scheduler, PrintJob
 
-from apssh import (LocalNode, SshNode, SshJob, Run, RunString, RunScript,
-                   TimeColonFormatter, Service, Deferred, Capture, Variables)
+from apssh import (LocalNode, SshNode, SshJob, Run, RunString, RunScript, Service, Deferred, Capture, Variables, Push)
+from apssh.formatters import  TimeHostFormatter #TimeHostFormatter
 
 # make sure to pip install r2lab
 from r2lab import ListOfChoices, ListOfChoicesNullReset, find_local_embedded_script
@@ -26,7 +26,7 @@ INCLUDES = [find_local_embedded_script(x) for x in (
 
 ##########
 default_gateway  = 'faraday.inria.fr'
-default_slicename  = 'inria_oaici'
+default_slicename  = 'inria_hive'
 
 default_nodes = [17, 23,26,7,19,2] # it was 14 instead of 26
 default_node_epc = 17
@@ -79,28 +79,29 @@ def run(*, gateway, slicename,
 
     faraday = SshNode(hostname=default_gateway, username=slicename,
                       verbose=verbose,
-                      formatter=TimeColonFormatter())
+                      formatter=TimeHostFormatter())
 
     epc = SshNode(gateway=faraday, hostname=fitname(node_epc),
                   username="root",
                   verbose=verbose,
-                  formatter=TimeColonFormatter())
+                  formatter=TimeHostFormatter())
     
     rapid_proxy = SshNode(gateway=faraday, hostname=fitname(default_server_rapid),
                           username="root",
                           verbose=verbose,
-                          formatter=TimeColonFormatter())
+                          formatter=TimeHostFormatter())
+    
 
     node_index = {
         id: SshNode(gateway=faraday, hostname=fitname(id),
-                    username="root",formatter=TimeColonFormatter(),
+                    username="root",formatter=TimeHostFormatter(),
                     verbose=verbose)
         for id in nodes
     }
     
     nodes_quectel_index = {
         id: SshNode(gateway=faraday, hostname=fitname(id),
-                    username="root",formatter=TimeColonFormatter(),
+                    username="root",formatter=TimeHostFormatter(),
                     verbose=verbose)
         for id in quectel_nodes
     }
@@ -140,7 +141,7 @@ def run(*, gateway, slicename,
                 verbose=verbose,
                 label = f"Load image {epc_image} on {fit_epc}",
                 commands=[
-                    Run(f"rhubarbe load {node_epc} -i {epc_image}"),
+                    Run(f"rhubarbe load {node_epc} -i {epc_image} -t 600"),
                     Run(f"rhubarbe wait {node_epc}"),
                     RunScript("oaici.sh", "init-epc", node_epc, node_enb),
                 ]
@@ -182,6 +183,10 @@ def run(*, gateway, slicename,
                 verbose=verbose,
                 label=f"Load image {default_server_image} on {default_server_cubic}",
                  commands=[
+                     Push( localpaths = [ "http-ev" ],
+                           remotepath = "."),
+                     Push( localpaths = [ "getRTT.sh" ],
+                           remotepath = "."),
 		     Run(f"rhubarbe load {default_server_cubic} -i {default_server_image}"),
 		     Run(f"rhubarbe wait {default_server_cubic}"),
                      RunScript("oaici.sh", "init-cubic", default_server_cubic),
@@ -195,6 +200,10 @@ def run(*, gateway, slicename,
                 verbose=verbose,
                 label=f"Load image {default_server_image} on {default_server_bbr}",
                  commands=[
+                     Push( localpaths = [ "http-ev" ],
+                           remotepath = "."),
+                     Push( localpaths = [ "getRTT.sh" ],
+                           remotepath = "."),
                      Run(f"rhubarbe load {default_server_bbr} -i {default_server_image}"),
                      Run(f"rhubarbe wait {default_server_bbr}"),
 		     RunScript("oaici.sh", "init-bbr", default_server_bbr),
@@ -211,7 +220,7 @@ def run(*, gateway, slicename,
                 label = f"Load image {enb_image} on {fit_enb}",
                 commands=[
                     Run(f"rhubarbe usrpoff {node_enb}"), # if usrp is on, load could be problematic...
-                    Run(f"rhubarbe load {node_enb} -i {enb_image}"),
+                    Run(f"rhubarbe load {node_enb} -i {enb_image} -t 600"),
                     Run(f"rhubarbe wait {node_enb}"),
                     Run(f"rhubarbe usrpon {node_enb}"), # ensure a reset of the USRP on the enB node
                     RunScript("oaici.sh", "init-enb", node_enb, node_epc),
@@ -254,7 +263,7 @@ def run(*, gateway, slicename,
             "Let Quectel modules show up",
             scheduler=scheduler,
             required=prepare_quectel,
-            sleep=120, #30
+            sleep=30, #30
             label="sleep 30s for the Quectel modules to show up"
         )
         # run the Quectel Connection Manager as a service on each Quectel UE node
@@ -345,14 +354,14 @@ def run(*, gateway, slicename,
         "Let the eNB start up",
         scheduler=scheduler,
         required=start_enb,
-        sleep=120,#50
+        sleep=50,#120
         label="sleep 50s for the eNB to start up"
     )
     wait_rapid_ready = PrintJob(
         "Let RAPID to start up",
         scheduler=scheduler,
         required=start_rapid,
-        sleep=120,#50                                                                                           
+        sleep=50,#120                                                                                           
         label="sleep 120s for RAPID to start up"
     )
     
@@ -407,7 +416,7 @@ def run(*, gateway, slicename,
             "Let the Quectel connection(s) set up",
             scheduler=scheduler,
             required=job_attach_quectel,
-            sleep=120, #30
+            sleep=30, #120
             label="Sleep 30s for the Quectel connection(s) to set up"
         )
         test_quectel_cx = [

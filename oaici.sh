@@ -80,7 +80,6 @@ function init-rapid (){
             tc qdisc add dev control root netem delay 4ms;
             docker start rabbitmq;
             sysctl -w net.ipv4.tcp_congestion_control=reno;
-            sh pepconf.sh;
             ip route change 192.168.3.0/24 dev control proto static initrwnd 80;"
             
 }
@@ -92,8 +91,7 @@ function start-rapid (){
            cd flexran-rtc;
            nohup sh run_flexran_rtc.sh > flex.out 2> flex.err < /dev/null &
            cd /root/RAPID-LINUX/;
-           make;
-           insmod rapid-llc.ko;"
+           "
     }
 
 function init-router (){
@@ -101,7 +99,7 @@ function init-router (){
     rapid="0"$rapid;
 
     ssh root@fit$rapid \
-	"echo 'Configure Middle Backhaul router and limit BW to 1Gbps';
+	"echo 'Configure Middle Backhaul router';
         sysctl net.ipv4.conf.all.forwarding=1;
         ifconfig data 192.168.2.2/24 up;
         ifconfig data:serv 22.22.22.4/24 up; 
